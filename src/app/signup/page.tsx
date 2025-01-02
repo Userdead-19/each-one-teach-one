@@ -4,7 +4,7 @@ import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-100 to-green-100">
       <Card className="w-full max-w-md">
@@ -30,12 +30,24 @@ export default function LoginPage() {
               className="rounded-full"
             />
           </div>
-          <CardTitle className="text-3xl font-bold">Welcome back!</CardTitle>
+          <CardTitle className="text-3xl font-bold">
+            Create an account
+          </CardTitle>
           <CardDescription>
-            Enter your credentials to access your account
+            Enter your details to start your learning journey
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input id="firstName" placeholder="John" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input id="lastName" placeholder="Doe" required />
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -49,39 +61,39 @@ export default function LoginPage() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input id="confirmPassword" type="password" required />
+          </div>
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
-              id="remember"
+              id="terms"
               className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+              required
             />
-            <label htmlFor="remember" className="text-sm text-gray-600">
-              Remember me
+            <label htmlFor="terms" className="text-sm text-gray-600">
+              I agree to the{" "}
+              <Link href="/terms" className="text-blue-600 hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-blue-600 hover:underline">
+                Privacy Policy
+              </Link>
             </label>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <Button
-            className="w-full bg-blue-600 hover:bg-blue-700"
-            onClick={() => {
-              console.log("login");
-              window.location.href = "/dashboard";
-            }}
-          >
-            Log in
+          <Button className="w-full bg-blue-600 hover:bg-blue-700">
+            Sign up
           </Button>
           <div className="text-sm text-center text-gray-600">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:underline">
-              Sign up
+            Already have an account?{" "}
+            <Link href="/" className="text-blue-600 hover:underline">
+              Log in
             </Link>
           </div>
-          <Link
-            href="/forgot-password"
-            className="text-sm text-center text-blue-600 hover:underline"
-          >
-            Forgot your password?
-          </Link>
         </CardFooter>
       </Card>
     </div>

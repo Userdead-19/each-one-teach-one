@@ -3,7 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bell, Home, Search, Settings, Users } from "lucide-react";
+import {
+  Bell,
+  Home,
+  Search,
+  Settings,
+  Users,
+  ListTodo,
+  UserPlus,
+  GraduationCap,
+  Bot,
+} from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -45,6 +55,18 @@ export function DashboardSidebar() {
           </NavItem>
           <NavItem href="/settings" icon={Settings}>
             Settings
+          </NavItem>
+          <NavItem href="/task-management" icon={ListTodo}>
+            Tasks
+          </NavItem>
+          <NavItem href="/socialize" icon={UserPlus}>
+            Socialize
+          </NavItem>
+          <NavItem href="/grade-tracker" icon={GraduationCap}>
+            Grades
+          </NavItem>
+          <NavItem href="/chatbot" icon={Bot}>
+            AI Assistant
           </NavItem>
         </nav>
 

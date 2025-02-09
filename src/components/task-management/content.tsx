@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { PlusCircle, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +22,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -31,167 +34,218 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-interface Task {
-  id: number;
-  title: string;
-  description: string;
-  dueDate: string;
-  status: "todo" | "in-progress" | "completed";
-  priority: "low" | "medium" | "high";
+const taskSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Title is required")
+    .max(100, "Title must be 100 characters or less"),
+  description: z
+    .string()
+    .max(500, "Description must be 500 characters or less"),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  status: z.enum(["todo", "in-progress", "completed"]),
+  priority: z.enum(["low", "medium", "high"]),
+});
+
+type Task = z.infer<typeof taskSchema>;
+
+async function getTasks() {
+  const res = await fetch("/api/tasks");
+  if (!res.ok) throw new Error("Failed to fetch tasks");
+  return res.json();
+}
+
+async function createTask(task: Task) {
+  const res = await fetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(task),
+  });
+  if (!res.ok) throw new Error("Failed to create task");
+  return res.json();
+}
+
+async function updateTask(task: Task) {
+  const res = await fetch("/api/tasks", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(task),
+  });
+  if (!res.ok) throw new Error("Failed to update task");
+  return res.json();
 }
 
 export function TaskManagementContent() {
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 1,
-      title: "Complete Math Assignment",
-      description: "Finish exercises 1-10 from Chapter 3",
-      dueDate: "2023-07-15",
-      status: "todo",
-      priority: "high",
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const {
+    data: tasks,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: getTasks,
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setIsDialogOpen(false);
     },
-    {
-      id: 2,
-      title: "Read History Chapter",
-      description: "Read Chapter 5: The Renaissance",
-      dueDate: "2023-07-18",
-      status: "in-progress",
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: updateTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
+  const form = useForm<Task>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      dueDate: "",
+      status: "todo",
       priority: "medium",
     },
-    {
-      id: 3,
-      title: "Prepare Science Presentation",
-      description: "Create slides for the ecosystem presentation",
-      dueDate: "2023-07-20",
-      status: "todo",
-      priority: "high",
-    },
-    {
-      id: 4,
-      title: "Submit English Essay",
-      description: "Write a 1000-word essay on Shakespeare",
-      dueDate: "2023-07-22",
-      status: "completed",
-      priority: "medium",
-    },
-  ]);
+  });
 
-  const addTask = (newTask: Omit<Task, "id">) => {
-    setTasks([...tasks, { ...newTask, id: tasks.length + 1 }]);
-  };
+  function onSubmit(values: Task) {
+    createTaskMutation.mutate(values);
+  }
 
-  const updateTaskStatus = (id: number, newStatus: Task["status"]) => {
-    setTasks(
-      tasks.map((task) =>
-        task.id === id ? { ...task, status: newStatus } : task
-      )
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
     );
-  };
+  if (error)
+    return (
+      <div className="flex items-center justify-center h-screen text-red-500">
+        An error occurred: {error.message}
+      </div>
+    );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Task Management</h1>
-          <p className="text-gray-500">Organize and track your assignments</p>
+          <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
+          <p className="text-gray-600">Organize and track your assignments</p>
         </div>
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-blue-500 hover:bg-blue-600">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Task
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Add New Task</DialogTitle>
               <DialogDescription>
                 Create a new task to keep track of your assignments
               </DialogDescription>
             </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                addTask({
-                  title: formData.get("title") as string,
-                  description: formData.get("description") as string,
-                  dueDate: formData.get("dueDate") as string,
-                  status: "todo",
-                  priority: formData.get("priority") as Task["priority"],
-                });
-              }}
-            >
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="title"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Title
-                  </label>
-                  <Input
-                    id="title"
-                    name="title"
-                    placeholder="Enter task title"
-                    required
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="description"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Description
-                  </label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    placeholder="Enter task description"
-                    required
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="dueDate"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Due Date
-                  </label>
-                  <Input id="dueDate" name="dueDate" type="date" required />
-                </div>
-                <div>
-                  <label
-                    htmlFor="priority"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Priority
-                  </label>
-                  <Select name="priority">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter className="mt-6">
-                <Button type="submit">Add Task</Button>
-              </DialogFooter>
-            </form>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-8"
+              >
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter task title" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter task description"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full">
+                  Submit
+                </Button>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {(["todo", "in-progress", "completed"] as const).map((status) => (
-          <Card key={status}>
-            <CardHeader>
-              <CardTitle className="flex items-center">
+          <Card key={status} className="bg-white shadow-lg">
+            <CardHeader className="bg-gray-50 border-b">
+              <CardTitle className="flex items-center text-lg">
                 {status === "todo" && (
                   <Clock className="mr-2 h-5 w-5 text-blue-500" />
                 )}
@@ -205,18 +259,22 @@ export function TaskManagementContent() {
                   status.slice(1).replace("-", " ")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[500px] pr-4">
+            <CardContent className="p-0">
+              <ScrollArea className="h-[500px]">
                 {tasks
-                  .filter((task) => task.status === status)
-                  .map((task) => (
-                    <Card key={task.id} className="mb-4">
+                  .filter((task: any) => task.status === status)
+                  .map((task: any) => (
+                    <Card key={task._id} className="m-4 bg-gray-50">
                       <CardHeader>
-                        <CardTitle>{task.title}</CardTitle>
+                        <CardTitle className="text-base">
+                          {task.title}
+                        </CardTitle>
                         <CardDescription>Due: {task.dueDate}</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-sm">{task.description}</p>
+                        <p className="text-sm text-gray-600">
+                          {task.description}
+                        </p>
                         <div className="mt-2">
                           <span
                             className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
@@ -237,13 +295,13 @@ export function TaskManagementContent() {
                         <Select
                           defaultValue={task.status}
                           onValueChange={(newStatus) =>
-                            updateTaskStatus(
-                              task.id,
-                              newStatus as Task["status"]
-                            )
+                            updateTaskMutation.mutate({
+                              ...task,
+                              status: newStatus as Task["status"],
+                            })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search, UserPlus, Users, MessageSquare } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,109 +18,75 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface User {
-  id: number;
-  name: string;
-  avatar: string;
-  course: string;
-  bio: string;
-}
-
-interface StudyGroup {
-  id: number;
-  name: string;
-  members: number;
-  course: string;
-  description: string;
+async function getSocialData(type: "users" | "groups" | "all") {
+  const res = await fetch(`/api/social?type=${type}`);
+  if (!res.ok) throw new Error("Failed to fetch social data");
+  return res.json();
 }
 
 export function SocializeContent() {
-  const [users] = useState<User[]>([
-    {
-      id: 1,
-      name: "Alice Smith",
-      avatar: "/placeholder.svg?height=40&width=40",
-      course: "Computer Science",
-      bio: "Passionate about AI and machine learning",
-    },
-    {
-      id: 2,
-      name: "Bob Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      course: "Biology",
-      bio: "Aspiring genetic engineer",
-    },
-    {
-      id: 3,
-      name: "Charlie Brown",
-      avatar: "/placeholder.svg?height=40&width=40",
-      course: "Literature",
-      bio: "Love reading classic novels",
-    },
-    {
-      id: 4,
-      name: "Diana Taylor",
-      avatar: "/placeholder.svg?height=40&width=40",
-      course: "Physics",
-      bio: "Fascinated by quantum mechanics",
-    },
-  ]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["social"],
+    queryFn: () => getSocialData("all"),
+  });
 
-  const [studyGroups] = useState<StudyGroup[]>([
-    {
-      id: 1,
-      name: "CS101 Study Group",
-      members: 15,
-      course: "Computer Science",
-      description: "Weekly meetings to discuss CS fundamentals",
-    },
-    {
-      id: 2,
-      name: "Biology Research Club",
-      members: 10,
-      course: "Biology",
-      description: "Collaborative research projects and discussions",
-    },
-    {
-      id: 3,
-      name: "Shakespeare Reading Group",
-      members: 8,
-      course: "Literature",
-      description: "Analyzing Shakespeare's plays and sonnets",
-    },
-    {
-      id: 4,
-      name: "Quantum Physics Explorers",
-      members: 12,
-      course: "Physics",
-      description: "Deep dive into quantum physics concepts",
-    },
-  ]);
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="flex items-center justify-center h-screen text-red-500">
+        An error occurred: {error.message}
+      </div>
+    );
+
+  const { users, studyGroups } = data;
+
+  const filteredUsers = users.filter(
+    (user: any) =>
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.course.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredGroups = studyGroups.filter(
+    (group: any) =>
+      group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      group.course.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div>
-        <h1 className="text-3xl font-bold">Socialize</h1>
-        <p className="text-gray-500">
+        <h1 className="text-3xl font-bold text-gray-800">Socialize</h1>
+        <p className="text-gray-600">
           Connect with fellow students and join study groups
         </p>
       </div>
 
       <div className="relative">
         <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-        <Input placeholder="Search users or study groups" className="pl-8" />
+        <Input
+          placeholder="Search users or study groups"
+          className="pl-8 bg-white"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      <Tabs defaultValue="users">
-        <TabsList>
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList className="bg-white">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="groups">Study Groups</TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <ScrollArea className="h-[600px]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {users.map((user) => (
-                <Card key={user.id}>
+              {filteredUsers.map((user: any) => (
+                <Card key={user._id} className="bg-white shadow-lg">
                   <CardHeader>
                     <div className="flex items-center space-x-4">
                       <Avatar>
@@ -127,7 +94,7 @@ export function SocializeContent() {
                         <AvatarFallback>
                           {user.name
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: any) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
@@ -138,7 +105,7 @@ export function SocializeContent() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm">{user.bio}</p>
+                    <p className="text-sm text-gray-600">{user.bio}</p>
                   </CardContent>
                   <CardFooter>
                     <Button variant="outline" className="w-full">
@@ -154,15 +121,15 @@ export function SocializeContent() {
         <TabsContent value="groups">
           <ScrollArea className="h-[600px]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {studyGroups.map((group) => (
-                <Card key={group.id}>
+              {filteredGroups.map((group: any) => (
+                <Card key={group._id} className="bg-white shadow-lg">
                   <CardHeader>
                     <CardTitle>{group.name}</CardTitle>
                     <CardDescription>{group.course}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm">{group.description}</p>
-                    <p className="text-sm mt-2">
+                    <p className="text-sm text-gray-600">{group.description}</p>
+                    <p className="text-sm mt-2 text-gray-600">
                       <Users className="inline mr-2 h-4 w-4" />
                       {group.members} members
                     </p>

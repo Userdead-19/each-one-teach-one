@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { PlusCircle, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import {
+  PlusCircle,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Trash2,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -43,23 +49,26 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
+// Schema for validation
 const taskSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(100, "Title must be 100 characters or less"),
-  description: z
-    .string()
-    .max(500, "Description must be 500 characters or less"),
+  title: z.string().min(1, "Title is required").max(100),
+  description: z.string().max(500),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
   status: z.enum(["todo", "in-progress", "completed"]),
   priority: z.enum(["low", "medium", "high"]),
 });
 
-type Task = z.infer<typeof taskSchema>;
+type Task = z.infer<typeof taskSchema> & { _id: string };
 
+// API functions
 async function getTasks() {
-  const res = await fetch("/api/tasks");
+  const res = await fetch("/api/tasks", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}` || "",
+    },
+  });
   if (!res.ok) throw new Error("Failed to fetch tasks");
   return res.json();
 }
@@ -75,7 +84,7 @@ async function createTask(task: Task) {
 }
 
 async function updateTask(task: Task) {
-  const res = await fetch("/api/tasks", {
+  const res = await fetch(`/api/tasks/${task._id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(task),
@@ -84,10 +93,30 @@ async function updateTask(task: Task) {
   return res.json();
 }
 
+// New API functions
+async function deleteTask(id: string) {
+  const res = await fetch(`/api/tasks/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete task");
+  return res.json();
+}
+
+async function updateTaskStatus(id: string, status: Task["status"]) {
+  const res = await fetch(`/api/tasks/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error("Failed to update task status");
+  return res.json();
+}
+
 export function TaskManagementContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // Queries
   const {
     data: tasks,
     isLoading,
@@ -97,6 +126,7 @@ export function TaskManagementContent() {
     queryFn: getTasks,
   });
 
+  // Mutations
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: () => {
@@ -112,6 +142,22 @@ export function TaskManagementContent() {
     },
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
+      updateTaskStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
+  // Form handling
   const form = useForm<Task>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -143,22 +189,17 @@ export function TaskManagementContent() {
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
-          <p className="text-gray-600">Organize and track your assignments</p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-800">Task Management</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-blue-500 hover:bg-blue-600">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Task
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Task</DialogTitle>
-              <DialogDescription>
-                Create a new task to keep track of your assignments
-              </DialogDescription>
+              <DialogDescription>Create a new task</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form
@@ -194,47 +235,7 @@ export function TaskManagementContent() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Due Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Priority</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full">
-                  Submit
-                </Button>
+                <Button type="submit">Submit</Button>
               </form>
             </Form>
           </DialogContent>
@@ -243,65 +244,31 @@ export function TaskManagementContent() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {(["todo", "in-progress", "completed"] as const).map((status) => (
-          <Card key={status} className="bg-white shadow-lg">
-            <CardHeader className="bg-gray-50 border-b">
-              <CardTitle className="flex items-center text-lg">
-                {status === "todo" && (
-                  <Clock className="mr-2 h-5 w-5 text-blue-500" />
-                )}
-                {status === "in-progress" && (
-                  <AlertCircle className="mr-2 h-5 w-5 text-yellow-500" />
-                )}
-                {status === "completed" && (
-                  <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
-                )}
-                {status.charAt(0).toUpperCase() +
-                  status.slice(1).replace("-", " ")}
-              </CardTitle>
+          <Card key={status}>
+            <CardHeader>
+              <CardTitle>{status.toUpperCase()}</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
+            <CardContent>
+              <ScrollArea>
                 {tasks
-                  .filter((task: any) => task.status === status)
+                  ?.filter((task: any) => task.status === status)
                   .map((task: any) => (
-                    <Card key={task._id} className="m-4 bg-gray-50">
+                    <Card key={task._id}>
                       <CardHeader>
-                        <CardTitle className="text-base">
-                          {task.title}
-                        </CardTitle>
+                        <CardTitle>{task.title}</CardTitle>
                         <CardDescription>Due: {task.dueDate}</CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-600">
-                          {task.description}
-                        </p>
-                        <div className="mt-2">
-                          <span
-                            className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                              task.priority === "high"
-                                ? "bg-red-100 text-red-800"
-                                : task.priority === "medium"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {task.priority.charAt(0).toUpperCase() +
-                              task.priority.slice(1)}{" "}
-                            Priority
-                          </span>
-                        </div>
-                      </CardContent>
                       <CardFooter>
                         <Select
                           defaultValue={task.status}
                           onValueChange={(newStatus) =>
-                            updateTaskMutation.mutate({
-                              ...task,
+                            updateTaskStatusMutation.mutate({
+                              id: task._id,
                               status: newStatus as Task["status"],
                             })
                           }
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -312,6 +279,12 @@ export function TaskManagementContent() {
                             <SelectItem value="completed">Completed</SelectItem>
                           </SelectContent>
                         </Select>
+                        <Button
+                          variant="destructive"
+                          onClick={() => deleteTaskMutation.mutate(task._id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </CardFooter>
                     </Card>
                   ))}

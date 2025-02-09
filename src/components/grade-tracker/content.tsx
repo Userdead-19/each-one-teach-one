@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlusCircle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,24 +47,53 @@ const courseSchema = z.object({
     .number()
     .min(1, "Credits must be at least 1")
     .max(6, "Credits must be 6 or less"),
+  userId: z.string().optional(),
 });
 
 type Course = z.infer<typeof courseSchema>;
 
-async function getCourses() {
-  const res = await fetch("/api/grades");
-  if (!res.ok) throw new Error("Failed to fetch courses");
-  const data = await res.json();
-  console.log("Fetched Courses:", data); // Debugging
-  return Array.isArray(data) ? data : []; // Ensure it's always an array
+async function getCourses(userId: string) {
+  if (!userId) return [];
+  try {
+    const res = await fetch(`/api/grades/${userId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token") || ""}`, // Include token
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const errorMessage = await res.text();
+      throw new Error(`Failed to fetch courses: ${errorMessage}`);
+    }
+
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching courses:", error);
+    return []; // Return an empty array on failure
+  }
 }
 
 async function createCourse(course: Course) {
+  const userId = localStorage.getItem("userId");
+  if (!userId) throw new Error("User ID not found");
+
+  const courseWithUserId = {
+    ...course,
+    userId,
+  };
+
   const res = await fetch("/api/grades", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(course),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    },
+    body: JSON.stringify(courseWithUserId),
   });
+
   if (!res.ok) throw new Error("Failed to create course");
   return res.json();
 }
@@ -72,22 +101,32 @@ async function createCourse(course: Course) {
 export function GradeTrackerContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUserId(localStorage.getItem("userId"));
+  }, []);
 
   const {
-    data: courses = [], // Ensure courses is at least an empty array
+    data: courses = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["courses"],
-    queryFn: getCourses,
+    queryKey: ["courses", userId],
+    queryFn: () => getCourses(userId as string),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
   });
 
   const createCourseMutation = useMutation({
     mutationFn: createCourse,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
+    onMutate: () => console.log("Mutation started"),
+    onSuccess: (data) => {
+      console.log("Mutation successful", data);
+      queryClient.invalidateQueries({ queryKey: ["courses", userId] });
       setIsDialogOpen(false);
     },
+    onError: (error) => console.error("Mutation error:", error),
   });
 
   const form = useForm<Course>({

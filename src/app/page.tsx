@@ -26,6 +26,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { jwtDecode } from "jwt-decode";
+
+interface DecodedToken {
+  userId: string;
+  exp: number; // Expiry timestamp
+}
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -64,6 +70,8 @@ export default function LoginPage() {
 
       // Store the token in localStorage or a secure cookie
       localStorage.setItem("token", result.token);
+      const decoded: DecodedToken = jwtDecode(result.token);
+      localStorage.setItem("userId", decoded.userId);
 
       toast({
         title: "Login Successful",

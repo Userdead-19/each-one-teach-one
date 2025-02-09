@@ -5,7 +5,12 @@ import QueryProvider from "@/components/QueryProvider"; // ✅ Use the new Clien
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  // Remove display: 'swap' as it's causing issues with Turbopack
+  variable: "--font-inter",
+  adjustFontFallback: true,
+});
 
 export const metadata = {
   title: "EduLearn",

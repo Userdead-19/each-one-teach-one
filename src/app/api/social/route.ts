@@ -1,30 +1,23 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongoose";
-import User from "@/lib/models/User";
-import StudyGroup from "@/lib/models/StudygGroup";
+import { NextResponse } from "next/server"
+import clientPromise from "@/lib/mongodb"
 
 export async function GET(request: Request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const type = searchParams.get("type");
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get("type")
 
-        await connectToDatabase();
+    const client = await clientPromise
+    const db = client.db("edulearn")
 
-        if (type === "users") {
-            const users = await User.find({});
-            return NextResponse.json(users, { status: 200 });
-        }
-        if (type === "groups") {
-            const groups = await StudyGroup.find({});
-            return NextResponse.json(groups, { status: 200 });
-        }
-
-        // Fetch both users and study groups
-        const [users, groups] = await Promise.all([User.find({}), StudyGroup.find({})]);
-
-        return NextResponse.json({ users, studyGroups: groups }, { status: 200 });
-    } catch (error) {
-        console.error("Error fetching data:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    if (type === "users") {
+        const users = await db.collection("users").find({}).toArray()
+        return NextResponse.json(users)
+    } else if (type === "groups") {
+        const groups = await db.collection("studyGroups").find({}).toArray()
+        return NextResponse.json(groups)
+    } else {
+        const users = await db.collection("users").find({}).toArray()
+        const groups = await db.collection("studyGroups").find({}).toArray()
+        return NextResponse.json({ users, studyGroups: groups })
     }
 }
+

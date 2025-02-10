@@ -1,73 +1,74 @@
+import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongoose";
-import { NextRequest } from "next/server";
 import Resource from "@/lib/models/Resource";
-// app/api/resources/[id]/route.ts
-import { deleteFromGridFS } from "@/lib/gridfs";
+import { ObjectId } from "mongodb";
 
-// Define RouteContext type for dynamic route params
-type RouteContext = {
-    params: {
-        id: string;
-    };
-};
-
-export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+// GET: Fetch a resource by ID
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         await connectToDatabase();
+
+        if (!ObjectId.isValid(id)) {
+            return NextResponse.json({ error: "Invalid resource ID format" }, { status: 400 });
+        }
+
         const resource = await Resource.findById(id);
 
         if (!resource) {
-            return Response.json(
-                { error: "Resource not found" },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: "Resource not found" }, { status: 404 });
         }
 
-        return Response.json(resource);
+        return NextResponse.json(resource, { status: 200 });
     } catch (error) {
         console.error("Error fetching resource:", error);
-        return Response.json(
-            { error: "Failed to fetch resource" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+// PUT: Update a resource by ID
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         await connectToDatabase();
-        const resource = await Resource.findById(id);
 
-        if (!resource) {
-            return Response.json(
-                { error: "Resource not found" },
-                { status: 404 }
-            );
+        if (!ObjectId.isValid(id)) {
+            return NextResponse.json({ error: "Invalid resource ID format" }, { status: 400 });
         }
 
-        // Delete file from GridFS
-        await deleteFromGridFS(resource.fileId);
+        const updates = await request.json();
+        const updatedResource = await Resource.findByIdAndUpdate(id, updates, { new: true });
 
-        // Delete resource record
-        await Resource.findByIdAndDelete(id);
+        if (!updatedResource) {
+            return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+        }
 
-        return Response.json({
-            message: "Resource deleted successfully",
-            resourceId: id
-        });
+        return NextResponse.json({ message: "Resource updated successfully", resource: updatedResource });
+    } catch (error) {
+        console.error("Error updating resource:", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}
+
+// DELETE: Delete a resource by ID
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params
+        await connectToDatabase();
+
+        if (!ObjectId.isValid(id)) {
+            return NextResponse.json({ error: "Invalid resource ID format" }, { status: 400 });
+        }
+
+        const deletedResource = await Resource.findByIdAndDelete(id);
+
+        if (!deletedResource) {
+            return NextResponse.json({ error: "Resource not found" }, { status: 404 });
+        }
+
+        return NextResponse.json({ message: "Resource deleted successfully" });
     } catch (error) {
         console.error("Error deleting resource:", error);
-        return Response.json(
-            { error: "Failed to delete resource" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

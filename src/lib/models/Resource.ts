@@ -1,40 +1,19 @@
-// lib/models/Resource.ts
-import mongoose from "mongoose";
+import mongoose, { Schema, Document } from "mongoose"
 
-const resourceSchema = new mongoose.Schema({
-    title: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    description: {
-        type: String,
-        required: true
-    },
-    type: {
-        type: String,
-        required: true,
-        enum: ['PDF', 'Video', 'Interactive', 'eBook', 'Flashcards']
-    },
-    fileUrl: {
-        type: String,
-        required: true
-    },
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    downloads: {
-        type: Number,
-        default: 0
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
-});
+export interface IResource extends Document {
+    title: string
+    type: string
+    url: string
+    uploadDate: Date
+    downloads: number
+}
 
-const Resource = mongoose.models.Resource || mongoose.model('Resource', resourceSchema);
+const ResourceSchema = new Schema<IResource>({
+    title: { type: String, required: true },
+    type: { type: String, required: true },
+    url: { type: String, required: true },
+    uploadDate: { type: Date, default: Date.now },
+    downloads: { type: Number, default: 0 }
+})
 
-export default Resource;
+export default mongoose.models.Resource || mongoose.model<IResource>("Resource", ResourceSchema)

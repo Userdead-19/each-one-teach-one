@@ -12,4 +12,14 @@ const nextConfig = {
   // Other existing config options...
 }
 
-module.exports = nextConfig
+module.exports = {
+  nextConfig, async redirects() {
+    return [
+      {
+        source: '/_not-found',
+        destination: '/',
+        permanent: false,
+      },
+    ];
+  },
+}
